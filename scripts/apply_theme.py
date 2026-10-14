@@ -37,8 +37,26 @@ from pptx.enum.chart import XL_CHART_TYPE
 
 
 def load_theme(path):
+    """Load theme.json and resolve its asset paths (template_pptx, logo.path)
+    relative to the theme file's own directory — not the process's current
+    working directory. Absolute paths are left untouched."""
+    theme_dir = os.path.dirname(os.path.abspath(path))
+
     with open(path, "r", encoding="utf-8") as f:
         theme = json.load(f)
+
+    def _resolve(rel_path):
+        if not rel_path or os.path.isabs(rel_path):
+            return rel_path
+        return os.path.normpath(os.path.join(theme_dir, rel_path))
+
+    if theme.get("template_pptx"):
+        theme["template_pptx"] = _resolve(theme["template_pptx"])
+
+    logo = theme.get("logo")
+    if logo and logo.get("path"):
+        logo["path"] = _resolve(logo["path"])
+
     return theme
 
 
@@ -61,25 +79,67 @@ def new_presentation(theme):
         slides = list(xml_slides)
         for s in slides:
             xml_slides.remove(s)
+        # Preserve the template's own slide geometry (e.g. 4:3 or a custom
+        # custom size) — do NOT override it with the default 16:9 dimensions.
     else:
         prs = Presentation()
-    prs.slide_width = Inches(13.333)
-    prs.slide_height = Inches(7.5)
+        prs.slide_width = Inches(13.333)
+        prs.slide_height = Inches(7.5)
     return prs
 
 
 def _blank_layout(prs):
-    # Index 6 is "Blank" in the default PowerPoint template; template decks
-    # may differ — adjust if using a custom template_pptx.
-    try:
-        return prs.slide_layouts[6]
-    except IndexError:
-        return prs.slide_layouts[-1]
+    """Find the closest thing to a 'blank' layout, rather than assuming it
+    lives at index 6 — that's only true for PowerPoint's default template,
+    and custom template_pptx files can order/name layouts differently.
+
+    Note even PowerPoint's own default 'Blank' layout carries a few
+    inherited (invisible until used) placeholders such as date/footer/slide
+    number, so we can't require exactly zero — we prefer a layout literally
+    named "blank", and otherwise fall back to whichever layout has the
+    fewest placeholders."""
+    named_candidates = [
+        layout for layout in prs.slide_layouts
+        if "blank" in layout.name.strip().lower()
+    ]
+    if named_candidates:
+        return named_candidates[0]
+
+    if len(prs.slide_layouts) == 0:
+        raise ValueError(
+            "This template_pptx has no slide layouts at all, so there is "
+            "nothing to build slides from. Use a different template or "
+            "fall back to a blank Presentation()."
+        )
+
+    return min(prs.slide_layouts, key=lambda layout: len(layout.placeholders))
+
+
+def _add_logo(slide, prs, theme):
+    """Place the logo per theme.logo.placement. Shared by every slide type
+    so placement is consistent (title slides previously ignored this and
+    always rendered top-left)."""
+    logo = theme.get("logo", {})
+    logo_path = logo.get("path")
+    if not (logo_path and os.path.exists(logo_path)):
+        return
+    max_w = Inches(logo.get("max_width_in", 0.9))
+    placement = logo.get("placement", "bottom-right")
+    if placement == "bottom-right":
+        left = prs.slide_width - max_w - Inches(0.3)
+        top = prs.slide_height - max_w - Inches(0.2)
+    elif placement == "top-right":
+        left = prs.slide_width - max_w - Inches(0.3)
+        top = Inches(0.2)
+    elif placement == "bottom-left":
+        left, top = Inches(0.3), prs.slide_height - max_w - Inches(0.2)
+    else:  # "top-left" and any unrecognized value fall back here
+        left, top = Inches(0.3), Inches(0.2)
+    slide.shapes.add_picture(logo_path, left, top, width=max_w)
 
 
 def _add_footer_and_logo(slide, prs, theme, page_number=None):
     rules = theme.get("layout_rules", {})
-    logo = theme.get("logo", {})
     colors = theme.get("colors", {})
 
     if rules.get("footer_text"):
@@ -90,28 +150,22 @@ def _add_footer_and_logo(slide, prs, theme, page_number=None):
         tf.paragraphs[0].font.size = Pt(theme.get("type_scale", {}).get("footnote_pt", 10))
         tf.paragraphs[0].font.color.rgb = _rgb(colors.get("text_primary", "#808080"))
 
-    if rules.get("show_page_numbers") and page_number is not None:
+    if rules.get("show_page_numbers"):
+        # Honor the theme's show_page_numbers setting even if the caller
+        # didn't pass an explicit page_number — derive it from the slide's
+        # actual position in the deck so far.
+        resolved_number = page_number
+        if resolved_number is None:
+            resolved_number = len(prs.slides._sldIdLst)
         left = prs.slide_width - Inches(1)
         top = prs.slide_height - Inches(0.4)
         box = slide.shapes.add_textbox(left, top, Inches(0.6), Inches(0.3))
         tf = box.text_frame
-        tf.text = str(page_number)
+        tf.text = str(resolved_number)
         tf.paragraphs[0].font.size = Pt(theme.get("type_scale", {}).get("footnote_pt", 10))
         tf.paragraphs[0].alignment = PP_ALIGN.RIGHT
 
-    logo_path = logo.get("path")
-    if logo_path and os.path.exists(logo_path):
-        max_w = Inches(logo.get("max_width_in", 0.9))
-        placement = logo.get("placement", "bottom-right")
-        if placement == "bottom-right":
-            left = prs.slide_width - max_w - Inches(0.3)
-            top = prs.slide_height - max_w - Inches(0.2)
-        elif placement == "top-right":
-            left = prs.slide_width - max_w - Inches(0.3)
-            top = Inches(0.2)
-        else:  # top-left default fallback
-            left, top = Inches(0.3), Inches(0.2)
-        slide.shapes.add_picture(logo_path, left, top, width=max_w)
+    _add_logo(slide, prs, theme)
 
 
 def add_title_slide(prs, theme, title, subtitle=None):
@@ -142,9 +196,7 @@ def add_title_slide(prs, theme, title, subtitle=None):
         stf.paragraphs[0].font.name = fonts.get("body", "Arial")
         stf.paragraphs[0].font.color.rgb = _rgb(colors.get("text_on_dark", "#FFFFFF"))
 
-    logo = theme.get("logo", {})
-    if logo.get("path") and os.path.exists(logo["path"]):
-        slide.shapes.add_picture(logo["path"], Inches(0.8), Inches(0.6), width=Inches(logo.get("max_width_in", 0.9)))
+    _add_logo(slide, prs, theme)
 
     return slide
 
@@ -243,10 +295,32 @@ def add_chart_slide(prs, theme, title, categories, series, chart_type="bar", pag
     chart = gframe.chart
 
     chart_sequence = colors.get("chart_sequence", [colors.get("primary", "#0B3D91")])
-    for i, plot_series in enumerate(chart.plots[0].series):
-        color = chart_sequence[i % len(chart_sequence)]
-        plot_series.format.fill.solid()
-        plot_series.format.fill.fore_color.rgb = _rgb(color)
+
+    if chart_type == "line":
+        # A series fill doesn't affect a line's stroke — set the line color
+        # (and marker fill, so markers match) per series instead.
+        for i, plot_series in enumerate(chart.plots[0].series):
+            color = chart_sequence[i % len(chart_sequence)]
+            plot_series.format.line.color.rgb = _rgb(color)
+            plot_series.format.line.width = Pt(2.25)
+            try:
+                plot_series.marker.format.fill.solid()
+                plot_series.marker.format.fill.fore_color.rgb = _rgb(color)
+            except (AttributeError, TypeError):
+                pass  # not all chart engines expose marker formatting the same way
+    elif chart_type == "pie":
+        # A series-level fill would make every slice the same color — color
+        # each point (slice) individually from chart_sequence instead.
+        plot_series = chart.plots[0].series[0]
+        for i, point in enumerate(plot_series.points):
+            color = chart_sequence[i % len(chart_sequence)]
+            point.format.fill.solid()
+            point.format.fill.fore_color.rgb = _rgb(color)
+    else:
+        for i, plot_series in enumerate(chart.plots[0].series):
+            color = chart_sequence[i % len(chart_sequence)]
+            plot_series.format.fill.solid()
+            plot_series.format.fill.fore_color.rgb = _rgb(color)
 
     _add_footer_and_logo(slide, prs, theme, page_number=page_number)
     return slide
