@@ -1,0 +1,41 @@
+{
+  "company_name": "Example Corp",
+  "template_pptx": "assets/example_template.pptx",
+  "logo": {
+    "path": "assets/example_logo.png",
+    "placement": "bottom-right",
+    "max_width_in": 0.9
+  },
+  "colors": {
+    "primary": "#0B3D91",
+    "secondary": "#1B998B",
+    "accent": "#F4A300",
+    "background": "#FFFFFF",
+    "background_dark": "#0B1220",
+    "text_primary": "#1A1A1A",
+    "text_on_dark": "#FFFFFF",
+    "chart_sequence": ["#0B3D91", "#1B998B", "#F4A300", "#C14953", "#6C5B7B", "#355C7D"]
+  },
+  "fonts": {
+    "heading": "Montserrat",
+    "body": "Source Sans Pro",
+    "heading_fallback": "Arial",
+    "body_fallback": "Arial"
+  },
+  "type_scale": {
+    "title_slide_pt": 40,
+    "slide_title_pt": 28,
+    "body_pt": 16,
+    "footnote_pt": 10
+  },
+  "layout_rules": {
+    "footer_text": "Example Corp — Confidential",
+    "show_page_numbers": true,
+    "margins_in": { "top": 0.5, "bottom": 0.5, "left": 0.6, "right": 0.6 }
+  },
+  "voice": {
+    "tone": "confident, concise, data-driven, no corporate jargon",
+    "language": "en",
+    "avoid": ["buzzwords like 'synergy' or 'leverage'", "exclamation marks"]
+  }
+}
