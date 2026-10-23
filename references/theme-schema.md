@@ -50,18 +50,26 @@ This file captures everything needed to render on-brand decks for one company. O
 
 - **template_pptx**: if present, ALWAYS start new decks from this file's master slides/layouts rather than building layouts from scratch in python-pptx. This is the single biggest driver of a deck actually looking "real" instead of generic. If absent, build one once from the other fields and offer to save it back into the theme for next time.
 - **colors.chart_sequence**: use this instead of python-pptx/PowerPoint default chart colors. Order matters — first color for the primary series.
-- **fonts**: PowerPoint will substitute a fallback if the exact font isn't installed on the viewer's machine; always set `*_fallback` to something common (Arial, Calibri) so the deck doesn't break on another computer.
+- **fonts**: if a font isn't installed on the viewer's machine, PowerPoint substitutes one of its own choosing. `heading_fallback` / `body_fallback` record the safe font to switch to (Arial, Calibri) and are informational — `apply_theme.py` does not read them, so if the brand font may be missing, put the safe font in `heading` / `body` instead.
 - **voice.language**: generate all slide text (titles, bullets, chart labels) in this language unless the user explicitly asks for another one for a specific deck.
-- **layout_rules.footer_text**: rendered on every content slide (not usually on title/section dividers).
+- **layout_rules.footer_text**: rendered on every content and chart slide (not on title/section dividers).
+- **layout_rules.margins_in**: left/right/top margins used by content and chart slides.
+- **logo.placement**: `bottom-right` (default), `top-right`, `bottom-left` or `top-left`. **logo.max_width_in** is the logo width; height follows the image's aspect ratio (needs Pillow).
+- **type_scale**: font sizes in points for the title slide, slide titles, body text and footer/page number.
+- **colors.background_dark**: reserved for dark slides; not used by `apply_theme.py` yet.
+- **voice.tone / voice.avoid**: guidance for Claude when writing slide text; not read by the script.
+- **Paths**: `template_pptx` and `logo.path` are resolved relative to the folder containing `theme.json`.
 
 ## Multiple brands / clients
 
 If the skill is being used by an agency or consultant across several clients, keep a `themes/` directory:
-```
+```text
 themes/
-├── acme/theme.json
-├── acme/assets/...
-├── globex/theme.json
-└── globex/assets/...
+├── acme/
+│   ├── theme.json
+│   └── assets/...
+└── globex/
+    ├── theme.json
+    └── assets/...
 ```
 Ask which theme to use if more than one exists and it's ambiguous from context.

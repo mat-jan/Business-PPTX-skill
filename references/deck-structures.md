@@ -23,12 +23,12 @@ Pick the closest match to the user's purpose, then adapt. These are starting ske
 3. Key metrics vs. target (dashboard-style)
 4. What went well (with the "why," not just the number)
 5. What went wrong / risks (own it, don't bury it)
-6. Deep dive on 1-2 most important metrics
+6. Deep dive on 1–2 most important metrics
 7. What's changing next period
 8. Asks / blockers / decisions needed
 
 ## Sales / client-facing deck
-1. Title (client name if customized)
+1. Title (client name if personalised)
 2. Their problem, in their words/context (shows you listened)
 3. Your solution mapped directly to that problem
 4. Proof — case studies, logos, numbers (not generic feature lists)
@@ -56,10 +56,10 @@ Pick the closest match to the user's purpose, then adapt. These are starting ske
 7. Asks/approvals needed
 8. Appendix (detailed tables — keep OUT of the main flow)
 
-## Conference / thought-leadership talk
+## Conference talk / thought leadership
 1. Title + hook (a question, surprising stat, or bold claim)
 2. Why this matters to this audience specifically
-3. 2-4 main points, each with one supporting story/data point
+3. 2–4 main points, each with one supporting story/data point
 4. A memorable framework or takeaway they can repeat to others
 5. Call to action / where to learn more
 

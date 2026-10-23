@@ -75,6 +75,5 @@ Zrobić dopiero gdy funkcjonalność się ustabilizuje — przedwczesny refaktor
 Priorytet wysoki mimo że w kategorii P3 — bez testów każdy kolejny PR ryzykuje cichym zepsuciem wcześniejszych napraw.
 
 ## Drobne porządki (dowolny moment)
-- Docstring w `apply_theme.py` używa `/mnt/user-data/outputs/` jako przykładowej ścieżki zapisu — to artefakt środowiska, w którym plik powstał; zmienić na neutralny placeholder (np. `"output/deck.pptx"`), żeby nie sugerować konkretnego środowiska
 - Doprecyzować w `SKILL.md`, że automatyczny zapis `theme.json` po ekstrakcji z istniejącego pliku `.pptx` następuje DOPIERO po potwierdzeniu wartości przez użytkownika (dziś kolejność jest nieco niejasna między sekcją ekstrakcji a głównym flow)
 - `references/deck-structures.md`: dodać wariant "reading deck / async deck" jako osobną strukturę (dziś jest tylko wzmianka o gęstszym tekście w notatce na dole pliku)
