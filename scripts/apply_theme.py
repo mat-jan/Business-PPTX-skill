@@ -35,6 +35,7 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
+from pptx.enum.shapes import PP_PLACEHOLDER
 
 
 def load_theme(path):
@@ -88,6 +89,16 @@ def _validate_theme(theme, source_path="theme.json"):
                 for c in chart_sequence:
                     if not _HEX_RE.match(c):
                         errors.append(f"colors.chart_sequence contains an invalid hex color: {c!r}.")
+
+    layouts = theme.get("layouts")
+    if layouts is not None:
+        valid = {"title", "section", "content", "chart"}
+        if not isinstance(layouts, dict):
+            errors.append("theme.layouts must be an object mapping slide kinds to layout names.")
+        else:
+            for k, v in layouts.items():
+                if k not in valid or not isinstance(v, str) or not v.strip():
+                    errors.append(f"layouts.{k} = {v!r}: keys must be one of {sorted(valid)} and values layout names.")
 
     fonts = theme.get("fonts", {})
     if not fonts.get("heading") or not fonts.get("body"):
@@ -217,6 +228,61 @@ def _blank_layout(prs):
     return min(prs.slide_layouts, key=lambda layout: len(layout.placeholders))
 
 
+# --- Template layout mode ---------------------------------------------------
+# When theme.json has a "layouts" mapping (kind -> layout name in template_pptx),
+# slides are created from those real layouts and the title/body placeholders
+# are filled, so fonts, colors, logo and footer come from the template's master.
+# Without a mapping (or if a name isn't found) the drawn-shape fallback is used.
+
+_TITLE_TYPES = (PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE)
+_BODY_TYPES = (PP_PLACEHOLDER.BODY, PP_PLACEHOLDER.OBJECT)
+
+
+def _mapped_layout(prs, theme, kind):
+    """Return the template layout configured for `kind` ("title", "section",
+    "content", "chart"), or None to use the drawn fallback."""
+    name = (theme.get("layouts") or {}).get(kind)
+    if not name:
+        return None
+    for layout in prs.slide_layouts:
+        if layout.name.strip().lower() == str(name).strip().lower():
+            return layout
+    warnings.warn(
+        f"theme.layouts.{kind} = {name!r} was not found in the template "
+        f"(available: {[l.name for l in prs.slide_layouts]}) — using the "
+        f"drawn fallback for this slide type.",
+        stacklevel=3,
+    )
+    return None
+
+
+def _placeholder(slide, types):
+    for ph in slide.placeholders:
+        if ph.placeholder_format.type in types:
+            return ph
+    return None
+
+
+def _prune_empty_placeholders(slide):
+    """Remove placeholders left empty so no 'Click to add text' ghosts remain."""
+    for ph in list(slide.placeholders):
+        if ph.has_text_frame and not ph.text_frame.text.strip():
+            ph._element.getparent().remove(ph._element)
+
+
+def _set_title(slide, text):
+    ph = _placeholder(slide, _TITLE_TYPES)
+    if ph is not None:
+        ph.text_frame.text = text
+    else:
+        warnings.warn("Layout has no title placeholder; the title was not rendered.", stacklevel=3)
+
+
+def _layout_footer(slide, prs, theme, page_number):
+    """Footer text / page number from theme rules; logo comes from the master."""
+    _add_footer_and_logo(slide, prs, theme, page_number=page_number, logo=False)
+
+
 def _logo_dimensions(logo_path, max_w):
     """Return (width, height) EMU for the logo, preserving its real aspect
     ratio so non-square logos (most logos) don't get stretched. Falls back
@@ -257,7 +323,7 @@ def _add_logo(slide, prs, theme):
     slide.shapes.add_picture(logo_path, left, top, width=logo_w, height=logo_h)
 
 
-def _add_footer_and_logo(slide, prs, theme, page_number=None):
+def _add_footer_and_logo(slide, prs, theme, page_number=None, logo=True):
     rules = theme.get("layout_rules", {})
     colors = theme.get("colors", {})
 
@@ -286,13 +352,24 @@ def _add_footer_and_logo(slide, prs, theme, page_number=None):
                name=theme.get("fonts", {}).get("body", "Arial"),
                color=colors.get("text_primary", "#1A1A1A"), alignment=PP_ALIGN.RIGHT)
 
-    _add_logo(slide, prs, theme)
+    if logo:
+        _add_logo(slide, prs, theme)
 
 
 def add_title_slide(prs, theme, title, subtitle=None):
     colors = theme.get("colors", {})
     fonts = theme.get("fonts", {})
     type_scale = theme.get("type_scale", {})
+
+    layout = _mapped_layout(prs, theme, "title")
+    if layout is not None:
+        slide = prs.slides.add_slide(layout)
+        _set_title(slide, title)
+        sub_ph = _placeholder(slide, (PP_PLACEHOLDER.SUBTITLE,) + _BODY_TYPES)
+        if subtitle and sub_ph is not None:
+            sub_ph.text_frame.text = subtitle
+        _prune_empty_placeholders(slide)
+        return slide
 
     slide = prs.slides.add_slide(_blank_layout(prs))
     bg = slide.background
@@ -322,6 +399,13 @@ def add_title_slide(prs, theme, title, subtitle=None):
 def add_section_slide(prs, theme, section_title):
     colors = theme.get("colors", {})
     fonts = theme.get("fonts", {})
+
+    layout = _mapped_layout(prs, theme, "section")
+    if layout is not None:
+        slide = prs.slides.add_slide(layout)
+        _set_title(slide, section_title)
+        _prune_empty_placeholders(slide)
+        return slide
 
     slide = prs.slides.add_slide(_blank_layout(prs))
     bg = slide.background
@@ -358,6 +442,31 @@ def add_content_slide(prs, theme, title, bullets=None, page_number=None):
     type_scale = theme.get("type_scale", {})
     m_left, m_right, m_top = _margins(theme)
 
+    if bullets and len(bullets) > 6:
+        warnings.warn(
+            f"add_content_slide('{title}'): {len(bullets)} bullets given, "
+            f"only the first 6 will be rendered (the 6x6 guideline is a "
+            f"content ceiling, not a silent-truncation rule — split this "
+            f"into two slides or trim the content instead).",
+            stacklevel=2,
+        )
+
+    layout = _mapped_layout(prs, theme, "content")
+    if layout is not None:
+        slide = prs.slides.add_slide(layout)
+        _set_title(slide, title)
+        body = _placeholder(slide, _BODY_TYPES)
+        if bullets and body is not None:
+            tf = body.text_frame
+            for i, bullet in enumerate(bullets[:6]):
+                p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+                p.text = bullet  # bullet style/fonts inherited from the layout
+        elif bullets:
+            warnings.warn("Layout has no body placeholder; bullets were not rendered.", stacklevel=2)
+        _prune_empty_placeholders(slide)
+        _layout_footer(slide, prs, theme, page_number)
+        return slide
+
     slide = prs.slides.add_slide(_blank_layout(prs))
     slide.background.fill.solid()
     slide.background.fill.fore_color.rgb = _rgb(colors.get("background", "#FFFFFF"))
@@ -365,14 +474,6 @@ def add_content_slide(prs, theme, title, bullets=None, page_number=None):
     _add_slide_title(slide, prs, theme, title)
 
     if bullets:
-        if len(bullets) > 6:
-            warnings.warn(
-                f"add_content_slide('{title}'): {len(bullets)} bullets given, "
-                f"only the first 6 will be rendered (the 6x6 guideline is a "
-                f"content ceiling, not a silent-truncation rule — split this "
-                f"into two slides or trim the content instead).",
-                stacklevel=2,
-            )
         bbox = slide.shapes.add_textbox(Inches(m_left), Inches(1.7),
                                          prs.slide_width - Inches(m_left + m_right), Inches(4.5))
         btf = bbox.text_frame
@@ -395,11 +496,23 @@ def add_chart_slide(prs, theme, title, categories, series, chart_type="bar", pag
     fonts = theme.get("fonts", {})
     type_scale = theme.get("type_scale", {})
 
-    slide = prs.slides.add_slide(_blank_layout(prs))
-    slide.background.fill.solid()
-    slide.background.fill.fore_color.rgb = _rgb(colors.get("background", "#FFFFFF"))
+    m_left, m_right, _ = _margins(theme)
+    x, y, cx, cy = Inches(m_left), Inches(1.7), prs.slide_width - Inches(m_left + m_right), Inches(4.8)
 
-    _add_slide_title(slide, prs, theme, title)
+    layout = _mapped_layout(prs, theme, "chart")
+    if layout is not None:
+        slide = prs.slides.add_slide(layout)
+        _set_title(slide, title)
+        body = _placeholder(slide, _BODY_TYPES)
+        if body is not None:  # use the layout's content area for the chart
+            x, y, cx, cy = body.left, body.top, body.width, body.height
+            body._element.getparent().remove(body._element)
+        _prune_empty_placeholders(slide)
+    else:
+        slide = prs.slides.add_slide(_blank_layout(prs))
+        slide.background.fill.solid()
+        slide.background.fill.fore_color.rgb = _rgb(colors.get("background", "#FFFFFF"))
+        _add_slide_title(slide, prs, theme, title)
 
     chart_data = CategoryChartData()
     chart_data.categories = categories
@@ -413,8 +526,6 @@ def add_chart_slide(prs, theme, title, categories, series, chart_type="bar", pag
         "pie": XL_CHART_TYPE.PIE,
     }.get(chart_type, XL_CHART_TYPE.COLUMN_CLUSTERED)
 
-    m_left, m_right, _ = _margins(theme)
-    x, y, cx, cy = Inches(m_left), Inches(1.7), prs.slide_width - Inches(m_left + m_right), Inches(4.8)
     gframe = slide.shapes.add_chart(xl_type, x, y, cx, cy, chart_data)
     chart = gframe.chart
     chart.font.name = fonts.get("body", "Arial")
@@ -456,5 +567,5 @@ def add_chart_slide(prs, theme, title, categories, series, chart_type="bar", pag
             plot_series.format.fill.solid()
             plot_series.format.fill.fore_color.rgb = _rgb(color)
 
-    _add_footer_and_logo(slide, prs, theme, page_number=page_number)
+    _add_footer_and_logo(slide, prs, theme, page_number=page_number, logo=layout is None)
     return slide

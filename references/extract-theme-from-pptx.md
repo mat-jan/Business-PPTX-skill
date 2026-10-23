@@ -2,6 +2,14 @@
 
 If the user has an existing branded deck or template, prefer reverse-engineering `theme.json` from it over asking them to re-specify colors/fonts from scratch — it's more accurate and less work for them.
 
+## Fast path: `scripts/ingest_template.py`
+
+```bash
+python scripts/ingest_template.py company.pptx themes/acme --name "Acme Corp"
+```
+
+This copies the template to `themes/acme/template.pptx`, extracts the logo to `assets/`, reads colors and fonts, guesses the `layouts` mapping and writes a draft `theme.json`. Show the printed summary to the user and correct anything wrong (see step 6 below). The manual steps below explain what the script does and how to do it by hand.
+
 ## Steps
 
 1. Load the `.pptx` with python-pptx:

@@ -58,6 +58,7 @@ This file captures everything needed to render on-brand decks for one company. O
 - **type_scale**: font sizes in points for the title slide, slide titles, body text and footer/page number.
 - **colors.background_dark**: reserved for dark slides; not used by `apply_theme.py` yet.
 - **voice.tone / voice.avoid**: guidance for Claude when writing slide text; not read by the script.
+- **layouts** (optional): maps slide kinds (`title`, `section`, `content`, `chart`) to layout names in `template_pptx`, e.g. `{"title": "Title Slide", "content": "Title and Content"}`. When set, `apply_theme.py` creates slides from those real layouts and fills the title/body placeholders, so fonts, colors, logo and footer come from the template's master (the script then does not draw its own logo). Kinds without a mapping, or names not found in the template, use the drawn fallback with a warning. `scripts/ingest_template.py` guesses this mapping for you.
 - **Paths**: `template_pptx` and `logo.path` are resolved relative to the folder containing `theme.json`.
 
 ## Multiple brands / clients
