@@ -24,7 +24,7 @@ Look for a theme file the user points to, or ask where it lives. Common location
   3. Logo file (PNG/SVG with transparent background, ideally)
   4. Any existing template `.pptx` they already use (if they have one, prefer extracting the theme FROM it rather than building from scratch — see `references/extract-theme-from-pptx.md`)
 
-  Then generate a `theme.json` per the schema and save it alongside the output so it can be reused next time. Tell the user explicitly: "Zapisałem Twój motyw w theme.json — przy kolejnych prezentacjach wystarczy się do niego odwołać, nie trzeba będzie podawać tych danych ponownie."
+  Then generate a `theme.json` per the schema and save it alongside the output so it can be reused next time. Tell the user explicitly, in their own language, that the theme was saved to `theme.json` and can simply be referenced next time without re-entering these details.
 
 Never invent brand colors/fonts/logo on your own if the user hasn't provided them and no theme file exists — ask first. Generic "corporate blue" defaults are a last resort only if the user explicitly says they don't care about branding for this one-off deck.
 
@@ -46,7 +46,7 @@ Use `references/deck-structures.md` for proven narrative patterns (investor pitc
 General slide-writing rules regardless of structure:
 - One idea per slide. If a slide needs "and" in its title, it's probably two slides.
 - Titles are a claim/insight, not a topic label. Prefer "Revenue grew 34% YoY driven by EMEA" over "Revenue Overview."
-- 6x6 guideline as a ceiling, not a target: max ~6 bullets, ~6 words each. If there's more to say, that's speaker notes, not slide text.
+- 6×6 guideline as a ceiling, not a target: max ~6 bullets, ~6 words each. If there's more to say, that's speaker notes, not slide text.
 - Every data slide should have ONE visual takeaway, not a raw data dump. Pull the insight into the title.
 - End with a clear next step / ask / decision needed — decks that just "present information" without a call to action are weaker.
 
@@ -69,11 +69,11 @@ Keep chart styling theme-consistent (use the theme's chart color sequence from `
 
 ## Step 5 — Render the deck
 
-Use python-pptx (see the `pptx` skill for setup details and gotchas) with `scripts/apply_theme.py` as a starting point — it reads `theme.json` and gives you helper functions for: title slide, section divider, content slide, chart slide, and a consistent footer/logo placement across all slides. Adapt/extend these helpers rather than writing slide XML from scratch.
+Use python-pptx (see the `pptx` skill for setup details and gotchas) with `scripts/apply_theme.py` as a starting point (add `scripts/` to `sys.path` to `import apply_theme`) — it reads `theme.json` and gives you helper functions for: title slide, section divider, content slide, chart slide, and a consistent footer/logo placement across all slides. Adapt/extend these helpers rather than writing slide XML from scratch.
 
 Concretely:
-1. Start from the theme's template `.pptx` if one exists (preserves real PowerPoint master slides/layouts — far more reliable than reconstructing layout from scratch). If no template exists yet, build one once using the theme colors/fonts and save it into the theme folder for reuse.
-2. Duplicate the right layout per slide type, fill placeholders with the outline content.
+1. Start from the theme's template `.pptx` if one exists (preserves the real master, theme and slide size — far more reliable than reconstructing them from scratch). If no template exists, the helpers fall back to a blank 16:9 presentation styled from the theme fields.
+2. The helpers add each slide on the template's "Blank" layout and draw titles, bullets, charts, footer and logo as themed shapes; they do not fill the template's layout placeholders. If the template relies on its placeholders, extend the helpers accordingly.
 3. Keep consistent margins, logo placement (usually bottom-right or footer), and page numbers per the theme config.
 4. For charts, generate them natively in pptx (editable) rather than as pasted images, unless the theme config specifies otherwise.
 
@@ -86,7 +86,7 @@ Before presenting the file, do a self-check:
 - Title slide and closing/next-steps slide present?
 - Speaker notes added for slides that need verbal context (optional, ask if wanted)?
 
-Then save to `/mnt/user-data/outputs/`, and present the file to the user along with the theme.json if it was newly created.
+Then save to the environment's output location (`/mnt/user-data/outputs/` in Claude.ai, otherwise the working directory or a path the user gives), and present the file to the user along with the theme.json if it was newly created.
 
 ## Reference files
 
