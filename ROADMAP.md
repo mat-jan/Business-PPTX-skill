@@ -1,5 +1,7 @@
 # Roadmap
 
+> Zrobione na gałęzi `beta`: `scripts/ingest_template.py` (szablon firmowy → `theme.json`) oraz tryb layoutów szablonu (`layouts` w `theme.json`).
+
 Status aktualny: `apply_theme.py` ma działający silnik renderujący i przeszedł dwie rundy code review (Copilot + ręczny review), z 10 zgłoszonych problemów naprawione zostały 6 bezpośrednio w kodzie. Poniżej lista tego, co zostało — w przybliżonej kolejności wartości/wysiłku.
 
 ## P0 — największa wartość, największy zakres

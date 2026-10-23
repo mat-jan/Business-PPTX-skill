@@ -14,7 +14,16 @@ Uniwersalny skill dla Claude (Claude Code / Claude.ai), który buduje profesjona
 - `references/deck-structures.md` — sprawdzone szkielety narracyjne (pitch inwestorski, QBR, deck sprzedażowy, aktualizacja projektu, raport do zarządu, prelekcja)
 - `references/extract-theme-from-pptx.md` — jak wyciągnąć motyw z już istniejącego firmowego szablonu PowerPoint
 - `assets/theme.example.json` — przykładowy, wypełniony plik motywu do skopiowania i edycji (wskazane w nim pliki `example_template.pptx` i `example_logo.png` są tylko przykładowe — podmień je na własne; brakujące pliki powodują ostrzeżenie i render bez logo/szablonu)
-- `scripts/apply_theme.py` — funkcje pomocnicze python-pptx, które czytają `theme.json` i renderują slajdy zgodnie z motywem
+- `scripts/apply_theme.py` — funkcje pomocnicze python-pptx, które czytają `theme.json` i renderują slajdy zgodnie z motywem (z mapowaniem `layouts` używa prawdziwych layoutów i placeholderów szablonu)
+- `scripts/ingest_template.py` — z firmowego `.pptx` tworzy szkic folderu motywu: `theme.json`, logo, kopię szablonu i mapowanie layoutów
+
+## Własny szablon firmowy
+
+```bash
+python scripts/ingest_template.py firma.pptx themes/firma --name "Firma S.A."
+```
+
+Skrypt kopiuje szablon do `themes/firma/template.pptx`, wyciąga logo, kolory i fonty z motywu PowerPoint, zgaduje które layouty odpowiadają slajdom tytułowemu / sekcji / treści / wykresowi i zapisuje szkic `theme.json`. Claude pokaże wyciągnięte wartości do potwierdzenia, a potem buduje prezentacje na prawdziwych layoutach Twojego szablonu.
 
 ## Pierwsze użycie
 

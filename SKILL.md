@@ -18,6 +18,7 @@ Read the company's `theme.json` (or create one if missing) → turn the user's c
 Look for a theme file the user points to, or ask where it lives. Common locations to check first: a file named `theme.json`, `brand.json`, or similar in the working directory or an uploaded file.
 
 - **If a theme file exists**: load it. Its schema is documented in `references/theme-schema.md` (copy `assets/theme.example.json` as a starting reference for the fields).
+- **If the user provides a company template (`.pptx`/`.potx`)** and no theme file: run `python scripts/ingest_template.py <template> themes/<company>` to generate a draft `theme.json` (colors, fonts, logo, layout mapping), show the extracted values and layout mapping to the user, apply their corrections, then continue. With a layout mapping the deck is built from the template's own layouts and placeholders.
 - **If no theme file exists**: this is a branding session, not just a deck. Ask the user (briefly, batched into one question) for:
   1. Primary + secondary brand color (hex codes) and an accent color
   2. Font for headings and font for body text (must be a font available in PowerPoint/Office, or embeddable)
@@ -73,7 +74,7 @@ Use python-pptx (see the `pptx` skill for setup details and gotchas) with `scrip
 
 Concretely:
 1. Start from the theme's template `.pptx` if one exists (preserves the real master, theme and slide size — far more reliable than reconstructing them from scratch). If no template exists, the helpers fall back to a blank 16:9 presentation styled from the theme fields.
-2. The helpers add each slide on the template's "Blank" layout and draw titles, bullets, charts, footer and logo as themed shapes; they do not fill the template's layout placeholders. If the template relies on its placeholders, extend the helpers accordingly.
+2. If `theme.json` has a `layouts` mapping, each slide is created from the mapped template layout and its title/body placeholders are filled (fonts, logo and footer come from the template master). Without a mapping, the helpers add slides on the template's "Blank" layout and draw titles, bullets, charts, footer and logo as themed shapes.
 3. Keep consistent margins, logo placement (usually bottom-right or footer), and page numbers per the theme config.
 4. For charts, generate them natively in pptx (editable) rather than as pasted images, unless the theme config specifies otherwise.
 
@@ -95,6 +96,7 @@ Then save to the environment's output location (`/mnt/user-data/outputs/` in Cla
 - `references/extract-theme-from-pptx.md` — how to reverse-engineer a theme.json from an existing company .pptx template
 - `assets/theme.example.json` — a filled-out example theme to copy and edit
 - `scripts/apply_theme.py` — python-pptx helper functions keyed off theme.json (title slide, section slide, content slide, chart slide, footer/logo)
+- `scripts/ingest_template.py` — builds a draft theme folder (`theme.json`, logo, template copy, layout mapping) from a company `.pptx`
 
 ## Common mistakes to avoid
 
